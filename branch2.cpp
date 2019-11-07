@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <thread>
 #include <chrono>
+#include <time.h>
 #include <random>
 #include "bank.pb.h"
 
@@ -24,6 +25,7 @@ Transfer trans;
 string currName;
 string currIp;
 int currPort;
+int initBal;
 
 map <string, int> branchList;
 
@@ -36,6 +38,28 @@ void transferRec(char *source, int amount){
 }
 
 void transferSend(){
+	// time delay first
+	srand(time(0));
+	int delay;
+	delay = rand() % 5000 + 1;
+	cout << "random delay: " << delay << endl;
+	std::this_thread::sleep_for(std::chrono::milliseconds(delay));
+
+	int sendAmount;
+	int sendPercent;
+	sendPercent = rand() % 5 + 1;
+	cout << "random percent selected: " << sendPercent << endl;
+
+	sendAmount = (sendPercent * initBal) / 100;
+	if(sendAmount < currBranch.balance()){
+		myMutex.lock();
+		currBranch.set_balance(currBranch.balance() - sendAmount);
+		myMutex.unlock();
+	} else{
+		cout << "This branch does not have enough money to transfer that much" << endl;
+	}
+
+	// Now transfer this money to another branch
 	
 
 }
@@ -105,6 +129,7 @@ int main(int argc, char* argv[]){
 			for(int i = 0; i < currBranch.all_branches_size(); i++){
 				const InitBranch_Branch addThis = currBranch.all_branches(i);
 				branchList.insert(pair<string, int>(addThis.name(), 0));
+				initBal = currBranch.balance();
 			}
 		}
 
