@@ -1,4 +1,5 @@
 all: controller
 
 controller: controller.cpp
-	g++ controller.cpp -o controller
+	pkg-config --cflags protobuf
+	c++ controller.cpp bank.pb.cc -o controller `pkg-config --cflags --libs protobuf`
