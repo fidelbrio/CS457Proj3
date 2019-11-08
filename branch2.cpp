@@ -141,6 +141,7 @@ int main(int argc, char* argv[]){
 				initBal = currBranch.balance();
 			}
 			cout<<"we got the init branch"<<endl;
+			cout<<currBranch.balance()<<endl;
 
 		}
 
