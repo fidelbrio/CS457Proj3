@@ -1,3 +1,6 @@
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <iostream>
 #include <fstream>
 #include <mutex>
@@ -70,7 +73,7 @@ int main(int argc, char* argv[]){
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
 
 	if(argc != 3){
-		cerr << "Usage: " << "argv[0] << "./branch <branch_name> <port_number>" << endl;
+		cerr << "Usage: " << argv[0] << "./branch <branch_name> <port_number>" << endl;
 		return -1;
 	}
 
@@ -90,6 +93,7 @@ int main(int argc, char* argv[]){
         cerr << "ERROR: failed in creating socket" << endl;
         exit(EXIT_FAILURE);
 	}
+	int option = 1;
    	if (setsockopt(server_ds, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &option, sizeof(option))){
 	        cerr << "ERROR: failed setsockopt" << endl;
         	exit(EXIT_FAILURE);
@@ -108,6 +112,12 @@ int main(int argc, char* argv[]){
 	}
 
 
+	struct hostent *hostIP;
+	char buf[256];
+	gethostname(buf,sizeof(buf));
+	hostIP = gethostbyname(buf);
+	currIp = inet_ntoa(*((struct in_addr*)hostIP->h_addr_list[0]));
+	cout<<currIp<<endl;
 	while(1){
 		if((my_socket = accept(server_ds, (struct sockaddr *) &socket_address, (socklen_t*) &address_len)) <0){
 			cerr << "ERROR: failed to accept" << endl;
@@ -119,29 +129,33 @@ int main(int argc, char* argv[]){
 			cerr << "ERROR: failed to read socket_buffer" << endl;
 			return -1;
 		}
-
+		cout<<"We just read"<<endl;
 		socket_buffer[read_count] = '\0';
 		message.ParseFromString(socket_buffer);
 
 		if(message.has_init_branch()){
 			currBranch = message.init_branch();
-			
 			for(int i = 0; i < currBranch.all_branches_size(); i++){
 				const InitBranch_Branch addThis = currBranch.all_branches(i);
 				branchList.insert(pair<string, int>(addThis.name(), 0));
 				initBal = currBranch.balance();
 			}
+			cout<<"we got the init branch"<<endl;
+
 		}
 
 		if(message.has_transfer()){
+			cout<<"We got the transfer"<<endl;
 			trans = message.transfer();
 
 			myMutex.lock();
 			currBranch.set_balance(currBranch.balance() + trans.amount());
 			myMutex.unlock();
 		}
-
-
+		cout<<"closing socket"<<endl;
+		close(my_socket);
+		close(server_ds);
+		exit(0);
 
 	}
 
