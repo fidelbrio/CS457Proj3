@@ -6,4 +6,4 @@ controller: controller.cpp
 
 branch2: branch2.cpp
 	pkg-config --cflags protobuf
-	c++ branch2.cpp bank.pb.cc -o branch2 `pkg-config --cflags --libs protobuf`
+	c++ branch2.cpp -g bank.pb.cc -o branch2 `pkg-config --cflags --libs protobuf`

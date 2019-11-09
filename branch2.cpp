@@ -106,7 +106,7 @@ void transferSend(int milli){
 			close(socc);
 			cout<<"just closed socc"<<endl;
 			moneyToBranch.release_transfer();
-			exit(0);
+			//exit(0);
 		}
 
 	}
@@ -189,7 +189,7 @@ int main(int argc, char* argv[]){
 	currIp = inet_ntoa(*((struct in_addr*)hostIP->h_addr_list[0]));
 	cout<<currIp<<endl;
 	int delay = stoi(argv[3]);
-	//thread transferThread(transferSend,delay);
+	thread transferThread(transferSend,delay);
 	while(1){
 		if((my_socket = accept(server_ds, (struct sockaddr *) &socket_address, (socklen_t*) &address_len)) <0){
 			cerr << "ERROR: failed to accept" << endl;
@@ -220,17 +220,17 @@ int main(int argc, char* argv[]){
 		if(message.has_transfer()){
 			cout<<"We got the transfer"<<endl;
 			trans = message.transfer();
-
+			cout<<"We just got $"<<trans.amount() << " from " << trans.send_branch()<<endl;
 			myMutex.lock();
 			currBranch.set_balance(currBranch.balance() + trans.amount());
 			myMutex.unlock();
 		}
 		cout<<"closing socket"<<endl;
 		close(my_socket);
-		close(server_ds);
+		//close(server_ds);
 		//exit(0);
 
 	}
-	//transferThread.join();
+	transferThread.join();
 
 }
