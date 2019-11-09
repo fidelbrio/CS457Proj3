@@ -26,7 +26,7 @@ std::mutex myMutex;
 BranchMessage message;
 InitBranch currBranch;
 Transfer trans;
-Marker mark;
+//Marker mark;
 string currName;
 string currIp;
 int currPort;
@@ -288,6 +288,8 @@ int main(int argc, char* argv[]){
 			cout<<"we got the init branch"<<endl;
 			cout<<currBranch.balance()<<endl;
 			isInitialized = true;
+			markerSource.insert(pair<string, bool>(message.name(), false));
+			channels.insert(pair<string, int>(message.name(), 0))
 		}
 
 		if(message.has_transfer()){
