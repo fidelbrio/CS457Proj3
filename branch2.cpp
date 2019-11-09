@@ -45,7 +45,7 @@ int markerIn;
 void marker(int snapID, char *source){
 	cout << "In marker function" << endl;
 	auto temp = snapshot.find(snapID);
-	if(temp != shapshot.end()){
+	if(temp != snapshot.end()){
 		cout << "This marker's been recieved before" << endl;
 
 		auto temp2 = markerSource.find(source);
@@ -53,7 +53,7 @@ void marker(int snapID, char *source){
 			temp2->second = false; // false?
 		}
 
-		for(itr = channels.begin(); itr != channels.end(); ++itr){
+		for(auto itr = channels.begin(); itr != channels.end(); ++itr){
 			if(itr->first == source){
 				if(itr->second == 0){
 					temp->second.add_channel_state(1);
@@ -70,10 +70,10 @@ void marker(int snapID, char *source){
 		localState.set_snapshot_id(snapID);
 		localState.set_balance(currBranch.balance());
 		localState.clear_channel_state();
-		for(itr = channels.begin(); itr != channels.end(); ++itr){
+		for(auto itr = channels.begin(); itr != channels.end(); ++itr){
 			itr->second = 0;
 		}
-		snapshot.insert(pair<int, ReturnSnapshot_LocalSnapshot> (localState.snapshot_id(), localSnapshot));
+		snapshot.insert(pair<int, ReturnSnapshot_LocalSnapshot> (localState.snapshot_id(), localState));
 
 		markerOut = 0;
 		markerIn = 0;
@@ -81,7 +81,7 @@ void marker(int snapID, char *source){
 		Marker initMarker;
 		initMarker.set_snapshot_id(localState.snapshot_id());
 
-		for(int i=0; i < currBrance.all_branch_size(); i++){
+		for(int i=0; i < currBranch.all_branches_size(); i++){
 			//sending marker to each branch
 
 			InitBranch_Branch branchG = currBranch.all_branches(i); //we are sending out this branch
@@ -283,13 +283,13 @@ int main(int argc, char* argv[]){
 			for(int i = 0; i < currBranch.all_branches_size(); i++){
 				const InitBranch_Branch addThis = currBranch.all_branches(i);
 				branchList.insert(pair<string, int>(addThis.name(), 0));
+				markerSource.insert(pair<string, bool>(addThis.name(), false));
+				channels.insert(pair<string, int>(addThis.name(), 0));
 				initBal = currBranch.balance();
 			}
 			cout<<"we got the init branch"<<endl;
 			cout<<currBranch.balance()<<endl;
 			isInitialized = true;
-			markerSource.insert(pair<string, bool>(message.name(), false));
-			channels.insert(pair<string, int>(message.name(), 0))
 		}
 
 		if(message.has_transfer()){
@@ -302,10 +302,30 @@ int main(int argc, char* argv[]){
 		}
 
 		if(message.has_marker()){
-			cout << "We received a marker!" < endl;
-			mark = message.marker();
-			cout << "We just got a marker from " << message.marker.send_branch() << end;
-			marker(message.marker.snapshot_id(), message.marker.send_branch());
+			cout << "We received a marker!" << endl;
+			//mark = message.marker();
+			int length = message.marker().send_branch().length();
+			char name[length+1];
+			strcpy(name, message.marker().send_branch());
+
+			cout << "We just got a marker from " << message.marker().send_branch() << endl;
+			//marker(message.marker().snapshot_id(), message.marker().send_branch());
+			marker(message.marker().snapshot_id(), name);
+
+		}
+
+		if(message.has_retrieve_snapshot()){
+			cout << "retrieve snapshot" << endl;
+			BranchMessage reply;
+			ReturnSnapshot returnSnap;
+
+			auto tempID = snapshot.find(message.retrieve_snapshot().snapshot_id());
+			if(tempID != snapshot.end()){
+				returnSnap.set_allocated_local_snapshot(&tempID->second);
+			}
+			reply.set_allocated_return_snapshot(&returnSnap);
+
+			//send message here
 		}
 
 		if(message.has_init_snapshot()){
