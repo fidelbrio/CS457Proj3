@@ -98,6 +98,7 @@ void transferSend(int milli){
 			int cnt = connect(socc, (struct sockaddr *)&addr, sizeof (addr));
 			if(cnt < 0){
 				cout<<"Error in connect"<<endl;
+				exit(0);
 			}
 			string outputMessage;
 			moneyToBranch.SerializeToString(&outputMessage);
@@ -224,6 +225,10 @@ int main(int argc, char* argv[]){
 			myMutex.lock();
 			currBranch.set_balance(currBranch.balance() + trans.amount());
 			myMutex.unlock();
+		}
+
+		if(message.has_init_snapshot()){
+			cout<<"snapshot just got initiated"<<endl;
 		}
 		cout<<"closing socket"<<endl;
 		close(my_socket);

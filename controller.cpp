@@ -1,3 +1,4 @@
+#include <thread>
 #include <iostream>
 #include <sstream>
 #include <stdio.h>
@@ -13,12 +14,17 @@
 #include <sys/types.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <random>
+#include <time.h>
 
 using namespace std;
 
 int numBranches = 0;
 InitBranch message;
 
+void retrieveSnapshot(int snapID){
+	
+}
 
 void InitBranch(string line, int amount){
 	istringstream iss(line);
@@ -108,11 +114,61 @@ int main(int argc, char * argv[]){
 		int cnt = connect(socc, (struct sockaddr *)&addr, sizeof (addr));
 		if(cnt < 0){
 			cout<<"Error in connect"<<endl;
+			exit(0);
 		}
 		send(socc, toBeSent.c_str(), toBeSent.size(), 0);
 		cout<<"just sent"<<endl;
 		close(socc);
 		cout<<"just closed socc"<<endl;
+	}
+	int snapID = 1;
+
+	while(1){
+
+		cout<<"Initiating snapshot" <<endl;
+		srand(time(0));
+		int randBranchIndex = rand() % message.all_branches().size();
+		InitBranch_Branch targetForSnap = message.all_branches(randBranchIndex);
+		int n = 1;
+		struct sockaddr_in addr;
+		int socc = socket(AF_INET, SOCK_STREAM,0);
+		if(socc < 0){
+			cout<<"Error establishing socket" <<endl;
+			exit(0);
+		}
+		setsockopt(socc, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &n, sizeof(n));
+		memset((char *)&addr, 0, sizeof(addr));
+		addr.sin_family = AF_INET;
+		addr.sin_addr.s_addr = htonl(INADDR_ANY);
+		addr.sin_port =htons(targetForSnap.port());
+		cout<<"Attempted port is " << targetForSnap.port() <<endl;
+       		int binder = bind(socc, (struct sockaddr *)&addr, sizeof(addr));
+        	if(binder < 0){
+        		cout<<"Error with binder"<<endl;
+                	exit(0);
+        	}
+        	int check = inet_pton(AF_INET, targetForSnap.ip().c_str(), &addr.sin_addr);
+        	if(check <= 0){
+        		cout<<"Error with inet_pton"<<endl;
+                	exit(0);
+        	}
+		int cnt = connect(socc, (struct sockaddr *)&addr, sizeof (addr));
+       		if(cnt < 0){
+        		cout<<"Error in connect: "<< cnt << endl;
+			//cout << explain_connect(socc, (struct sockaddr *)&addr, sizeof(addr)) << endl;
+			exit(0);
+       		}
+		string snapStart;
+		InitSnapshot initialSnap;
+		initialSnap.set_snapshot_id(snapID);
+		initializer.set_allocated_init_snapshot(&initialSnap);
+		initializer.SerializeToString(&snapStart);
+		send(socc,snapStart.c_str(), snapStart.size(), 0);
+		close(socc);
+		initializer.release_init_snapshot();
+		this_thread::sleep_for(10s);
+		retrieveSnapshot(snapID);
+		snapID++;
 	}
 }
 
