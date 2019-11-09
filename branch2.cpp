@@ -18,6 +18,7 @@
 #include <time.h>
 #include <random>
 #include "bank.pb.h"
+#include <thread>
 
 using namespace std;
 
@@ -29,7 +30,7 @@ string currName;
 string currIp;
 int currPort;
 int initBal;
-
+bool isInitialized = false;
 map <string, int> branchList;
 
 
@@ -40,9 +41,79 @@ void transferRec(char *source, int amount){
 
 }
 
-void transferSend(){
+void transferSend(int milli){
+	cout<<"In transfer function"<<endl;
+	while(!isInitialized){}
+	while(1){
+		srand(time(0));
+		int delay = (rand()%milli) + 1;
+		cout<<"random delay: "<< delay <<endl;
+		this_thread::sleep_for(chrono::milliseconds(delay));
+		int sendPercent = (rand()%5)+1;
+		cout<<"random percent selected "<<sendPercent <<endl;
+		int sendAmount = int(currBranch.balance()*(sendPercent/100.0));
+		cout<<"send amount selected " << sendAmount <<endl;
+		if(sendAmount < currBranch.balance()){
+                	myMutex.lock();
+                	currBranch.set_balance(currBranch.balance() - sendAmount);
+                	myMutex.unlock();
+        	}else{
+                	cout << "This branch does not have enough money to transfer that much" << endl;
+			exit(0);
+        	}
+		int randBranchIndex = rand() % currBranch.all_branches().size();
+		InitBranch_Branch targetBranch = currBranch.all_branches(randBranchIndex);
+		if(currPort != targetBranch.port()){
+			Transfer moneyGram;
+			BranchMessage moneyToBranch;
+			moneyGram.set_amount(sendAmount);
+			moneyGram.set_send_branch(currName);
+			moneyToBranch.set_allocated_transfer(&moneyGram);
+			int n = 1;
+			struct sockaddr_in addr;
+			int socc = socket(AF_INET, SOCK_STREAM, 0);
+			if(socc < 0){
+				cout<<"Error establishing socket"<<endl;
+				exit(0);
+			}
+			setsockopt(socc,SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &n, sizeof(n));
+			cout<<"Check a"<<endl;
+			memset((char *)&addr, 0, sizeof(addr));
+			addr.sin_family = AF_INET;
+        		addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        		addr.sin_port =htons(targetBranch.port());
+			int binder = bind(socc, (struct sockaddr *)&addr, sizeof(addr));
+                	if(binder < 0){
+                        	cout<<"Error with binder"<<endl;
+                        	exit(0);
+                	}
+
+			//struct sockaddr_in server;
+        		int check = inet_pton(AF_INET, targetBranch.ip().c_str(), &addr.sin_addr);
+			if(check <= 0){
+				cout<<"Error with inet_pton"<<endl;
+				exit(0);
+			}
+			cout<<"Check b"<<endl;
+			int cnt = connect(socc, (struct sockaddr *)&addr, sizeof (addr));
+			if(cnt < 0){
+				cout<<"Error in connect"<<endl;
+			}
+			string outputMessage;
+			moneyToBranch.SerializeToString(&outputMessage);
+			send(socc, outputMessage.c_str(), outputMessage.size(), 0);
+			cout<<"just sent"<<endl;
+			close(socc);
+			cout<<"just closed socc"<<endl;
+			moneyToBranch.release_transfer();
+			exit(0);
+		}
+
+	}
+	return;
+
 	// time delay first
-	srand(time(0));
+	/*srand(time(0));
 	int delay;
 	delay = rand() % 5000 + 1;
 	cout << "random delay: " << delay << endl;
@@ -60,10 +131,9 @@ void transferSend(){
 		myMutex.unlock();
 	} else{
 		cout << "This branch does not have enough money to transfer that much" << endl;
-	}
+	}*/
 
 	// Now transfer this money to another branch
-	
 
 }
 
@@ -72,8 +142,8 @@ void transferSend(){
 int main(int argc, char* argv[]){
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-	if(argc != 3){
-		cerr << "Usage: " << argv[0] << "./branch <branch_name> <port_number>" << endl;
+	if(argc != 4){
+		cerr << "Usage: " << argv[0] << "./branch <branch_name> <port_number> <transfer_interval>" << endl;
 		return -1;
 	}
 
@@ -118,6 +188,8 @@ int main(int argc, char* argv[]){
 	hostIP = gethostbyname(buf);
 	currIp = inet_ntoa(*((struct in_addr*)hostIP->h_addr_list[0]));
 	cout<<currIp<<endl;
+	int delay = stoi(argv[3]);
+	//thread transferThread(transferSend,delay);
 	while(1){
 		if((my_socket = accept(server_ds, (struct sockaddr *) &socket_address, (socklen_t*) &address_len)) <0){
 			cerr << "ERROR: failed to accept" << endl;
@@ -142,7 +214,7 @@ int main(int argc, char* argv[]){
 			}
 			cout<<"we got the init branch"<<endl;
 			cout<<currBranch.balance()<<endl;
-
+			isInitialized = true;
 		}
 
 		if(message.has_transfer()){
@@ -156,8 +228,9 @@ int main(int argc, char* argv[]){
 		cout<<"closing socket"<<endl;
 		close(my_socket);
 		close(server_ds);
-		exit(0);
+		//exit(0);
 
 	}
+	//transferThread.join();
 
 }
