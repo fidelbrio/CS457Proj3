@@ -26,6 +26,7 @@ std::mutex myMutex;
 BranchMessage message;
 InitBranch currBranch;
 Transfer trans;
+Marker mark;
 string currName;
 string currIp;
 int currPort;
@@ -33,6 +34,74 @@ int initBal;
 bool isInitialized = false;
 map <string, int> branchList;
 
+map <int, ReturnSnapshot_LocalSnapshot> snapshot; //saved state goes here
+map <string, bool> markerSource;
+map <string, int> channels;
+
+int markerOut;
+int markerIn;
+
+
+void marker(int snapID, char *source){
+	cout << "In marker function" << endl;
+	auto temp = snapshot.find(snapID);
+	if(temp != shapshot.end()){
+		cout << "This marker's been recieved before" << endl;
+
+		auto temp2 = markerSource.find(source);
+		if(temp2 != markerSource.end()){
+			temp2->second = false; // false?
+		}
+
+		for(itr = channels.begin(); itr != channels.end(); ++itr){
+			if(itr->first == source){
+				if(itr->second == 0){
+					temp->second.add_channel_state(1);
+				}else{
+					temp->second.add_channel_state(1+itr->second);
+				}
+			}
+		}
+	}else{
+		cout << "This is the first time we see this marker" << endl;
+
+		BranchMessage initSnap;
+		ReturnSnapshot_LocalSnapshot localState;
+		localState.set_snapshot_id(snapID);
+		localState.set_balance(currBranch.balance());
+		localState.clear_channel_state();
+		for(itr = channels.begin(); itr != channels.end(); ++itr){
+			itr->second = 0;
+		}
+		snapshot.insert(pair<int, ReturnSnapshot_LocalSnapshot> (localState.snapshot_id(), localSnapshot));
+
+		markerOut = 0;
+		markerIn = 0;
+
+		Marker initMarker;
+		initMarker.set_snapshot_id(localState.snapshot_id());
+
+		for(int i=0; i < currBrance.all_branch_size(); i++){
+			//sending marker to each branch
+
+			InitBranch_Branch branchG = currBranch.all_branches(i); //we are sending out this branch
+			bool sent;
+
+			if(currPort != branchG.port()){
+				cout << currPort << " sending Marker to " << branchG.port() << endl;
+				markerOut++;
+				auto temp2 = markerSource.find(branchG.name());
+				if(temp2 != markerSource.end()){
+					temp2->second = true;
+				} //else?
+			}
+			cout << "Pretend were sending messages right now" << endl;
+
+
+		}
+	}
+
+}
 
 void transferRec(char *source, int amount){
 
@@ -140,6 +209,9 @@ void transferSend(int milli){
 
 
 
+
+
+
 int main(int argc, char* argv[]){
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
 
@@ -225,6 +297,13 @@ int main(int argc, char* argv[]){
 			myMutex.lock();
 			currBranch.set_balance(currBranch.balance() + trans.amount());
 			myMutex.unlock();
+		}
+
+		if(message.has_marker()){
+			cout << "We received a marker!" < endl;
+			mark = message.marker();
+			cout << "We just got a marker from " << message.marker.send_branch() << end;
+			marker(message.marker.snapshot_id(), message.marker.send_branch());
 		}
 
 		if(message.has_init_snapshot()){
