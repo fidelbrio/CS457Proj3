@@ -110,6 +110,76 @@ void transferRec(char *source, int amount){
 
 }
 
+
+void initSnap(InitSnapshot init){
+	BranchMessage initializer;
+	ReturnSnapshot_LocalSnapshot currState;
+	currState.set_balance(currBranch.balance());
+	currState.set_snapshot_id(init.snapshot_id());
+	for(auto itr = channels.begin(); itr!= channels.end(); itr++){
+		itr->second = 0;
+	}
+	for(int i = 0; i<currBranch.all_branches_size(); i++){
+		InitBranch_Branch workingWith = currBranch.all_branches(i);
+		if(currPort != workingWith.port()){
+			auto itr = markerSource.find(workingWith.name());
+			if(itr == markerSource.end()){
+				cout<<"name of branch not found in marker source" <<endl;
+			}else{
+				itr->second = true;
+			}
+		}
+	}
+	for(int i = 0; i<currBranch.all_branches_size(); i++){
+		InitBranch_Branch targetBranch = currBranch.all_branches(i);
+		if(currPort != targetBranch.port()){
+			markerOut++;
+			int n = 1;
+                	struct sockaddr_in addr;
+                	int socc = socket(AF_INET, SOCK_STREAM, 0);
+                	if(socc < 0){
+                		cout<<"Error establishing socket"<<endl;
+                        	exit(0);
+                	}
+                	setsockopt(socc,SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &n, sizeof(n));
+                //        cout<<"Check a"<<endl;
+                	memset((char *)&addr, 0, sizeof(addr));
+                	addr.sin_family = AF_INET;
+                        addr.sin_addr.s_addr = htonl(INADDR_ANY);
+                        addr.sin_port =htons(targetBranch.port());
+                        int binder = bind(socc, (struct sockaddr *)&addr, sizeof(addr));
+                        if(binder < 0){
+                                cout<<"Error with binder"<<endl;
+                                exit(0);
+                        }
+
+                        //struct sockaddr_in server;
+                        int check = inet_pton(AF_INET, targetBranch.ip().c_str(), &addr.sin_addr);
+                        if(check <= 0){
+                                cout<<"Error with inet_pton"<<endl;
+                                exit(0);
+                        }
+                        //cout<<"Check b"<<endl;
+                        int cnt = connect(socc, (struct sockaddr *)&addr, sizeof (addr));
+                        if(cnt < 0){
+                                cout<<"Error in connect"<<endl;
+                                exit(0);
+                        }
+			string output;
+	        	Marker markerInitializer;
+        		markerInitializer.set_send_branch(currName);
+        		markerInitializer.set_snapshot_id(init.snapshot_id());
+        		initializer.set_allocated_marker(&markerInitializer);
+        		initializer.SerializeToString(&output);
+			send(socc, output.c_str(), output.size(), 0);
+                        close(socc);
+		}
+	}
+	initializer.release_marker();
+}
+
+
+
 void transferSend(int milli){
 	cout<<"In transfer function"<<endl;
 	while(!isInitialized){}
@@ -330,6 +400,8 @@ int main(int argc, char* argv[]){
 
 		if(message.has_init_snapshot()){
 			cout<<"snapshot just got initiated"<<endl;
+			init = message.init_snapshot();
+			initSnap(init);
 		}
 		cout<<"closing socket"<<endl;
 		close(my_socket);
