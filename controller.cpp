@@ -23,7 +23,80 @@ int numBranches = 0;
 InitBranch message;
 
 void retrieveSnapshot(int snapID){
-	
+	cout << "Retrieve Snapshot\n\n" << endl;
+	RetrieveSnapshot ret;
+	BranchMessage sendThis;
+
+	ret.set_snapshot_id(snapID);
+	sendThis.set_allocated_retrieve_snapshot(&ret);
+	string output;
+	sendThis.SerializeToString(&output);
+	for(int i=0; i < message.all_branches_size(); i++){
+			//sending marker to each branch
+
+			InitBranch_Branch branchG = message.all_branches(i); //we are sending out this branch
+			//bool sent;
+
+			//if(currPort != branchG.port()){
+				//cout << currPort << " sending Marker to " << branchG.port() << endl;
+				//markerOut++;
+				//auto temp2 = markerSource.find(branchG.name());
+				//if(temp2 != markerSource.end()){
+				//	temp2->second = true;
+				//} //else?
+			//}
+			int n = 1;
+                	struct sockaddr_in addr;
+                	int socc = socket(AF_INET, SOCK_STREAM, 0);
+                	if(socc < 0){
+                		cout<<"Error establishing socket"<<endl;
+                        	exit(0);
+                	}
+                	setsockopt(socc,SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &n, sizeof(n));
+                //        cout<<"Check a"<<endl;
+                	memset((char *)&addr, 0, sizeof(addr));
+                	addr.sin_family = AF_INET;
+                        addr.sin_addr.s_addr = htonl(INADDR_ANY);
+                        addr.sin_port =htons(branchG.port());
+                        int binder = bind(socc, (struct sockaddr *)&addr, sizeof(addr));
+                        if(binder < 0){
+                                cout<<"Error with binder"<<endl;
+                                exit(0);
+                        }
+                        //struct sockaddr_in server;
+                        int check = inet_pton(AF_INET, branchG.ip().c_str(), &addr.sin_addr);
+                        if(check <= 0){
+                                cout<<"Error with inet_pton"<<endl;
+                                exit(0);
+                        }
+                        //cout<<"Check b"<<endl;
+                        int cnt = connect(socc, (struct sockaddr *)&addr, sizeof (addr));
+                        if(cnt < 0){
+                                cout<<"Error in connect"<<endl;
+                                exit(0);
+                        }
+                        //initSnap.SerializeToString(&output);
+                        send(socc,output.c_str(),output.size(),0);
+			char inBuff[5000] = {0};
+			int weGotIt = read(socc, inBuff, 5000);
+			if(weGotIt < 0){
+				cout<<"Error in reading in response" <<endl;
+				exit(0);
+			}else{
+				inBuff[weGotIt] = '\0'; //delimiting message by how many bytes we read
+				BranchMessage whatWeGot;
+				whatWeGot.ParseFromString(inBuff);
+				if(whatWeGot.has_return_snapshot()){
+					ReturnSnapshot curr = whatWeGot.return_snapshot();
+					if(curr.has_local_snapshot()){
+						ReturnSnapshot_LocalSnapshot innerCurr = curr.local_snapshot();
+						//NOW WE CAN PRINT OUT THE SNAPSHOT OF THE BRANCHES;
+					}
+				}
+                        close(socc);
+                 }
+	}
+	sendThis.release_retrieve_snapshot();
 }
 
 void InitBranch(string line, int amount){
@@ -42,20 +115,6 @@ int main(int argc, char * argv[]){
 		cout<<"Usage: "<<argv[0] << " <initial_money> <input_branch_file>" <<endl;
 		exit(0);
 	}
-	/*int socc = socket(AF_INET, SOCK_STREAM, 0);
-	if(socc < 0){
-		cout<<"Error establishing socket"<<endl;
-		exit(0);
-	}
-	int n = 1;
-	setsockopt(socc,SOL_SOCKET,SO_REUSEADDR | SO_REUSEPORT,&n,sizeof(n));
-	struct sockaddr_in addr;
-	memset((char *)&addr, 0, sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	addr.sin_port =htons(8080);*/
-	//running on port 8080 SUBJECT TO CHANGE
-	
 
 
 	//setting variables from stdin
@@ -66,7 +125,7 @@ int main(int argc, char * argv[]){
 		cout<<"Error opening branches.txt file" <<endl;
 		exit(0);
 	}else{
-		cout<<"File just got opened"<<endl;
+		//cout<<"File just got opened"<<endl;
 		while(getline(book,line)){
 			InitBranch(line, amount);
 			cout<<line<<endl;
@@ -74,7 +133,7 @@ int main(int argc, char * argv[]){
 		}
 	}
 	book.close();
-	cout<<"book checker"<<endl;
+	//cout<<"book checker"<<endl;
 	int divAm = amount/numBranches;
 	message.set_balance(divAm);
 	string toBeSent;
@@ -82,7 +141,7 @@ int main(int argc, char * argv[]){
 	initializer.set_allocated_init_branch(&message);
 	initializer.SerializeToString(&toBeSent);
 	initializer.release_init_branch();
-	cout<<"initializer check" <<endl;
+	//cout<<"initializer check" <<endl;
 	for(int i = 0; i<message.all_branches_size(); i++){
 		InitBranch_Branch currBranch = message.all_branches(i);
 		int n = 1;
@@ -93,7 +152,6 @@ int main(int argc, char * argv[]){
 			exit(0);
 		}
 		setsockopt(socc,SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &n, sizeof(n));
-		cout<<"Check a"<<endl;
 		memset((char *)&addr, 0, sizeof(addr));
 		addr.sin_family = AF_INET;
         	addr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -110,22 +168,23 @@ int main(int argc, char * argv[]){
 			cout<<"Error with inet_pton"<<endl;
 			exit(0);
 		}
-		cout<<"Check b"<<endl;
+		//cout<<"Check b"<<endl;
 		int cnt = connect(socc, (struct sockaddr *)&addr, sizeof (addr));
 		if(cnt < 0){
 			cout<<"Error in connect"<<endl;
 			exit(0);
 		}
 		send(socc, toBeSent.c_str(), toBeSent.size(), 0);
-		cout<<"just sent"<<endl;
+		//cout<<"just sent"<<endl;
 		close(socc);
-		cout<<"just closed socc"<<endl;
+		//cout<<"just closed socc"<<endl;
+		cout<<"Just Finished Initializing Branch\n\n" <<endl;
 	}
 	int snapID = 1;
 
 	while(1){
 
-		cout<<"Initiating snapshot" <<endl;
+		cout<<"Initiating snapshot\n\n" <<endl;
 		srand(time(0));
 		int randBranchIndex = rand() % message.all_branches().size();
 		InitBranch_Branch targetForSnap = message.all_branches(randBranchIndex);
@@ -141,7 +200,7 @@ int main(int argc, char * argv[]){
 		addr.sin_family = AF_INET;
 		addr.sin_addr.s_addr = htonl(INADDR_ANY);
 		addr.sin_port =htons(targetForSnap.port());
-		cout<<"Attempted port is " << targetForSnap.port() <<endl;
+		cout<<"Attempted port to start snapshot is " << targetForSnap.port() <<"\n\n"<<endl;
        		int binder = bind(socc, (struct sockaddr *)&addr, sizeof(addr));
         	if(binder < 0){
         		cout<<"Error with binder"<<endl;
@@ -164,11 +223,11 @@ int main(int argc, char * argv[]){
 		initializer.set_allocated_init_snapshot(&initialSnap);
 		initializer.SerializeToString(&snapStart);
 		send(socc,snapStart.c_str(), snapStart.size(), 0);
+		cout<<"Message to start snapshot has been sent\n\n"<<endl;
 		close(socc);
 		initializer.release_init_snapshot();
-		this_thread::sleep_for(10s);
+		this_thread::sleep_for(20s);
 		retrieveSnapshot(snapID);
 		snapID++;
 	}
 }
-
